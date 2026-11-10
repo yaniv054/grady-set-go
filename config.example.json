@@ -1,0 +1,8 @@
+{
+  "media_root": "D:\\Media",
+  "port": 8790,
+  "engine_url": "http://127.0.0.1:8787",
+  "feedback_email": "",
+  "feedback_endpoint": "",
+  "update_check": "on"
+}

@@ -1,0 +1,16 @@
+Grady Set Go - Playout App
+Created by Yaniv Grady. Copyright (c) 2026 Yaniv Grady. Licensed under the MIT License (see LICENSE).
+
+This project is not affiliated with or endorsed by the authors of ffplayout, FFmpeg,
+MusicBrainz, Wikidata, whisper.cpp, hls.js, YouTube or any other product named here.
+
+It does not include or redistribute any of the following. Each is installed separately by the
+user and is covered by its own license:
+  - ffplayout (GPL-3.0)           https://github.com/ffplayout/ffplayout
+  - FFmpeg / ffprobe (LGPL/GPL)   https://ffmpeg.org
+  - whisper.cpp and models (MIT; model licenses vary)
+  - Node.js (MIT)
+The browser UI may load hls.js (Apache-2.0) for the live preview.
+
+Data lookups (optional, off unless enabled): MusicBrainz (data CC0, API rules apply) and
+Wikidata (CC0).

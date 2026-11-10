@@ -1,0 +1,899 @@
+<!doctype html>
+<!-- Grady Set Go - Playout App. Created by Yaniv Grady. Copyright (c) 2026 Yaniv Grady. MIT License (see LICENSE). -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Grady Set Go - Playout App</title>
+<link rel="stylesheet" href="/style.css">
+<script src="/vendor/hls.min.js" defer></script>
+<script src="/ui/00-i18n.js" defer></script>
+<script src="/ui/00-utils.js" defer></script>
+<script src="/ui/10-undo.js" defer></script>
+<script src="/ui/20-api.js" defer></script>
+<script src="/ui/30-start.js" defer></script>
+<script src="/ui/32-setup.js" defer></script>
+<script src="/ui/35-i18n-ui.js" defer></script>
+<script src="/ui/36-feedback.js" defer></script>
+<script src="/ui/38-update.js" defer></script>
+<script src="/ui/37-appbrand.js" defer></script>
+<script src="/ui/40-status.js" defer></script>
+<script src="/ui/50-dashboard.js" defer></script>
+<script src="/ui/60-outputs.js" defer></script>
+<script src="/ui/70-program.js" defer></script>
+<script src="/ui/72-program-tools.js" defer></script>
+<script src="/ui/80-blocks.js" defer></script>
+<script src="/ui/90-builder.js" defer></script>
+<script src="/ui/A0-library.js" defer></script>
+<script src="/ui/A2-analysis.js" defer></script>
+<script src="/ui/A4-library-docs.js" defer></script>
+<script src="/ui/A6-asrun.js" defer></script>
+<script src="/ui/B0-channel.js" defer></script>
+<script src="/ui/B2-live.js" defer></script>
+<script src="/ui/B4-logs.js" defer></script>
+<script src="/ui/B6-branding.js" defer></script>
+<script src="/ui/C0-attention.js" defer></script>
+<script src="/help.js" defer></script>
+</head>
+<body>
+
+<!-- Login / setup gate -------------------------------------------------- -->
+<section id="gate" class="gate" hidden>
+  <div class="gate-card">
+    <div class="brand signin-brand"><img class="brand-logo" id="brand-logo-signin" alt="" hidden><span class="dot" id="brand-dot-signin"></span> <span class="brand-name">Grady Set Go</span></div>
+
+    <form id="check-form" hidden>
+      <h1 data-i18n>Welcome. Let's check this PC.</h1>
+      <p class="muted" data-i18n>The panel needs a few programs and folders. Anything missing is listed with the steps to fix it. This page re-checks by itself every few seconds.</p>
+      <ul id="chk-list" class="chk-list"></ul>
+      <div id="chk-holder" hidden>
+        <div id="chk-media-box">
+          <label id="chk-media-field" class="chk-field"><span data-i18n>Media folder (your video files; the panel only reads it)</span>
+            <span class="chk-pick"><input name="media_root" dir="ltr" autocomplete="off" spellcheck="false" placeholder="D:\Videos"><button class="btn" type="button" id="chk-browse" data-i18n>Browse ...</button></span></label>
+          <div id="chk-browser" class="chk-browser" hidden>
+            <div class="chk-browser-head"><button class="btn small" type="button" id="chk-browser-up" data-i18n>Up one level</button><span id="chk-browser-path" dir="ltr"></span></div>
+            <ul id="chk-browser-list" class="chk-browser-list"></ul>
+            <div class="row"><button class="btn primary small" type="button" id="chk-browser-use" data-i18n>Use this folder</button><button class="btn small" type="button" id="chk-browser-close" data-i18n>Close</button></div>
+          </div>
+        </div>
+        <details id="chk-ffprobe-adv" class="chk-adv">
+          <summary data-i18n>Advanced</summary>
+          <label class="chk-field"><span data-i18n>ffprobe program (leave as found unless it is wrong)</span> <input name="ffprobe" dir="ltr" autocomplete="off" spellcheck="false"></label>
+        </details>
+        <div id="chk-engine-libs-actions" class="chk-actions"><button class="btn primary" type="button" id="chk-engine-libs" data-i18n>Download the FFmpeg libraries (about 86 MB)</button></div>
+        <div id="chk-engine-actions" class="chk-actions"><button class="btn primary" type="button" id="chk-engine-start" data-i18n>Start ffplayout</button></div>
+        <details id="chk-engine-adv" class="chk-adv">
+          <summary data-i18n>Advanced</summary>
+          <label class="chk-field"><span data-i18n>ffplayout address</span> <input name="engine_url" dir="ltr" autocomplete="off" spellcheck="false"></label>
+          <button class="btn" type="button" id="chk-engine-save-start" data-i18n>Save address and start ffplayout</button>
+        </details>
+        <div id="chk-whisper-actions" class="chk-actions"><button class="btn" type="button" id="chk-whisper-get" data-i18n>Download the speech-to-text tools</button>
+          <div id="chk-whisper-progress" class="chk-dl" hidden><progress id="chk-whisper-bar" max="100"></progress> <span id="chk-whisper-txt" dir="auto"></span></div></div>
+      </div>
+      <div class="row">
+        <button class="btn" type="button" id="chk-recheck" data-i18n>Check again</button>
+        <button class="btn primary" type="submit" id="chk-save" data-i18n>Save and continue</button>
+      </div>
+      <div class="chk-progress" id="chk-progress" hidden role="progressbar" aria-busy="true"><span></span></div>
+      <p class="form-msg" id="chk-msg"></p>
+    </form>
+
+    <form id="login-form" hidden>
+      <h1 data-i18n>Sign in</h1>
+      <p class="muted" data-i18n>Use your ffplayout admin account. Credentials go straight to the local ffplayout server.</p>
+      <label><span data-i18n>Username</span> <input name="username" autocomplete="username" required></label>
+      <label><span data-i18n>Password</span> <input name="password" type="password" autocomplete="current-password" required></label>
+      <div id="login-2fa" hidden><label><span data-i18n>Two-factor code</span> <input name="code" inputmode="numeric" autocomplete="one-time-code"></label></div>
+      <button class="btn primary wide" type="submit" data-i18n>Sign in</button>
+      <p class="form-msg" id="login-msg"></p>
+    </form>
+
+    <form id="setup-form" hidden>
+      <h1 data-i18n>First-time setup</h1>
+      <p class="muted"><span data-i18n>Creates the global admin and the folders ffplayout uses. Paths can only be changed later from the command line (</span><code>ffplayout -i</code><span data-i18n>), so check them now.</span></p>
+      <fieldset>
+        <legend data-i18n>Admin account</legend>
+        <div class="grid2">
+          <label><span data-i18n>Username</span> <input name="username" required autocomplete="username"></label>
+          <label><span data-i18n>Email</span> <input name="mail" type="email" required></label>
+          <label><span data-i18n>Password</span> <input name="password" type="password" required minlength="8" autocomplete="new-password"></label>
+          <label><span data-i18n>Repeat password</span> <input name="password2" type="password" required minlength="8" autocomplete="new-password"><span class="field-err" id="setup-pw-err" role="alert" hidden></span></label>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend data-i18n>Folders</legend>
+        <label><span data-i18n>Playlists</span> <input name="playlists" required value=""></label>
+        <label><span data-i18n>Public (HLS preview output)</span> <input name="public" required value=""></label>
+        <label><span data-i18n>Logs</span> <input name="logs" required value=""></label>
+        <label><span data-i18n>Media storage root</span> <input name="storage" required value=""></label>
+        <p class="hint"><span data-i18n>ffplayout writes into the storage root: it creates a</span> <code>00-assets</code> <span data-i18n>folder (logo, subtitle placeholder), and uploads from the web UI land there. Keep it off the protected</span> <code>Media</code> <span data-i18n>share.</span></p>
+      </fieldset>
+      <button class="btn primary wide" type="submit" data-i18n>Complete setup</button>
+      <p class="form-msg" id="setup-msg"></p>
+    </form>
+  </div>
+</section>
+
+<!-- App ------------------------------------------------------------------ -->
+<div id="app" class="app" hidden>
+  <aside class="side">
+    <div class="brand"><img class="brand-logo" id="brand-logo-sidebar" alt="" hidden><span class="dot" id="brand-dot"></span> <span class="brand-name">Grady Set Go</span></div>
+    <nav>
+      <a href="#dashboard" data-view="dashboard" data-i18n>Dashboard</a>
+      <a href="#outputs" data-view="outputs" data-i18n>Outputs &amp; keys</a>
+      <a href="#program" data-view="program" data-i18n>Program</a>
+      <a href="#library" data-view="library" data-i18n>Library</a>
+      <a href="#asrun" data-view="asrun" data-i18n>As-run</a>
+      <a href="#channel" data-view="channel" data-i18n>Channel &amp; schedule</a>
+      <a href="#live" data-view="live"><span data-i18n>Live input</span> <span data-i18n-attr="title" class="nav-count bad" id="cap-nav" hidden title="A capture device is being sent to the live input" data-i18n>LIVE</span></a>
+      <a href="#branding" data-view="branding" data-i18n>Channel branding</a>
+      <a href="#attention" data-view="attention" class="nav-attn"><span data-i18n>Needs attention</span> <span class="nav-count" id="attn-count" hidden></span></a>
+    </nav>
+    <div class="side-foot">
+      <div id="who" class="muted small"></div>
+      <label class="lang-pick small"><span class="sr-only"><span data-i18n>Language</span></span><select id="lang-select" aria-label="Language" data-i18n-attr="aria-label"></select></label>
+      <a class="small" href="#hidden" data-view="hidden" data-i18n>Hidden media</a>
+      <a data-i18n-attr="title" class="small" href="#undo" id="undo-open" title="Undo recent changes" data-i18n>Undo…</a>
+      <a class="small" href="#logs" data-view="logs" data-i18n>Logs</a>
+      <div class="help-row"><button data-i18n-attr="title" class="help-toggle" id="help-toggle" type="button" aria-pressed="false" title="Show ? markers with short explanations"><span class="hq-ico">?</span> <span data-i18n>Help</span></button><a class="small" href="#" id="help-tour" data-i18n>Tutorial</a></div>
+      <a data-i18n-attr="title" class="small" href="#system" data-view="system" id="nav-system" hidden title="Cross-app decisions (administrator)" data-i18n>System settings</a>
+      <a class="small update-badge" href="#update" id="update-badge" hidden></a>
+      <a class="small" href="#feedback" id="feedback-open" data-i18n>Send feedback</a>
+      <a class="small" href="http://127.0.0.1:8787" target="_blank" rel="noopener" data-i18n>Open ffplayout UI ↗</a>
+      <button class="btn ghost small" id="logout" data-i18n>Sign out</button>
+    </div>
+  </aside>
+
+  <main>
+    <div id="conn" class="conn" role="status" hidden data-i18n>Connection lost: reconnecting… (the panel or ffplayout may be restarting)</div>
+    <div id="onair" class="onair" hidden></div>
+    <div id="sched-alert" class="conn" role="status" hidden></div>
+    <div id="cap-alert" class="conn cap-alert" role="alert" hidden></div>
+
+    <!-- Dashboard -->
+    <section class="view" id="view-dashboard">
+      <header class="view-head"><h1 data-i18n>Dashboard</h1><span id="chan-name" class="muted"></span></header>
+      <div class="cards3">
+        <div class="card stat"><div class="label" data-i18n>Playout</div><div class="value" id="st-process">—</div></div>
+        <div class="card stat"><div class="label" data-i18n>Active output</div><div class="value" id="st-output">—</div><div class="out-health" hidden></div></div>
+        <div class="card stat"><div class="label" data-i18n>Live ingest</div><div class="value" id="st-ingest">—</div></div>
+      </div>
+      <div class="split">
+        <div class="card">
+          <h2 data-i18n>Now playing</h2>
+          <div class="now-head">
+            <img id="now-thumb" class="thumb now" alt="" hidden>
+            <div><div id="now-title" class="now-title">—</div>
+            <div id="now-meta" class="muted small"></div></div>
+          </div>
+          <div class="now-time" id="now-time" hidden>
+            <div class="progress" id="now-progress"><div></div></div>
+            <div class="row-between small"><span id="now-elapsed" class="mono"></span><span id="now-remaining" class="mono"></span></div>
+            <div class="row-between small muted"><span id="now-started" class="mono"></span><span id="now-ends" class="mono"></span></div>
+          </div>
+          <div class="btn-row">
+            <button class="btn primary" data-process="start" data-i18n>Start</button>
+            <button class="btn" data-process="restart" data-i18n>Restart</button>
+            <button class="btn danger" data-process="stop" data-i18n>Stop</button>
+          </div>
+          <div class="btn-row">
+            <button class="btn ghost" data-control="back" data-i18n>◀ Back</button>
+            <button class="btn ghost" data-control="next" data-i18n>Next ▶</button>
+            <button class="btn ghost" data-control="reset" data-i18n>Reset to schedule</button>
+          </div>
+          <h3 data-i18n>System</h3>
+          <dl class="kv" id="sys"></dl>
+        </div>
+        <div class="card">
+          <h2 data-i18n>Preview</h2>
+          <div class="player-wrap"><video id="player" controls muted playsinline></video><img id="player-still" class="player-still" alt="" hidden><div id="player-msg" class="player-msg" data-i18n>Preview is available when the HLS output is active and playout is running.</div></div>
+          <p class="muted small"><span data-i18n>HLS:</span> <code id="hls-url"></code></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Outputs -->
+    <section class="view" id="view-outputs" hidden>
+      <header class="view-head"><h1 data-i18n>Outputs &amp; keys</h1></header>
+      <p class="muted"><span data-i18n>One output is live at a time. Stream keys are sent straight to ffplayout when you press</span> <b data-i18n>Apply</b><span data-i18n>. This panel never saves or shows them; the field is cleared right after sending.</span></p>
+      <div class="cards3 outputs" id="outputs-cards"></div>
+    </section>
+
+    <!-- Program -->
+    <section class="view" id="view-program" hidden>
+      <header class="view-head">
+        <h1 data-i18n>Program</h1>
+        <div class="inline" id="pl-daynav">
+          <button data-i18n-attr="title" class="btn ghost" id="pl-prev" title="Previous day">◀</button>
+          <span class="datefield"><input data-i18n-attr="placeholder" type="text" class="date-txt" data-for="pl-date" inputmode="numeric" placeholder="dd/mm/yy" autocomplete="off"><button data-i18n-attr="title" type="button" class="btn ghost icon date-pick" data-for="pl-date" title="Pick a date">📅</button><input type="date" id="pl-date" class="date-native" tabindex="-1"></span>
+          <button data-i18n-attr="title" class="btn ghost" id="pl-next" title="Next day">▶</button>
+        </div>
+      </header>
+      <div class="split wide-left">
+        <div class="card">
+          <div class="row-between">
+            <h2 id="pl-title" data-i18n>Playlist</h2>
+            <div class="btn-row tight">
+              <button data-i18n-attr="title" class="btn ghost" id="pl-fix-paths" title="Update saved playlists (today on) for files that were renamed or moved on the share" data-i18n>Fix moved files</button>
+              <button data-i18n-attr="title" class="btn ghost" id="feed-export" title="Save the next 7 days as JSON and XMLTV" data-i18n>Export schedule</button>
+              <button class="btn" id="pl-reload" data-i18n>Reload</button>
+              <button class="btn primary" id="pl-save" data-i18n>Save</button>
+              <button class="btn ghost danger" id="pl-delete" data-i18n>Delete</button>
+              <button data-i18n-attr="title" class="btn ghost" id="pl-saveday" title="Save the whole playlist of this day as a reusable block" data-i18n>Save day as block…</button>
+              <button data-i18n-attr="title" class="btn ghost" id="pl-builder" title="Edit this day in the two-pane block builder" data-i18n>Open in builder</button>
+            </div>
+          </div>
+          <div id="pl-summary" class="summary"></div>
+          <div class="selbar" id="pl-selbar" hidden></div>
+          <div class="table-wrap"><table class="tbl" id="pl-table">
+            <thead><tr><th class="selcell"><input data-i18n-attr="aria-label;title" type="checkbox" id="pl-selall" aria-label="Select all rows" title="Select all rows (Shift+click a row for a range)"></th><th>#</th><th data-i18n>Start</th><th data-i18n>Title</th><th data-i18n>Folder</th><th class="num" data-i18n>Duration</th><th></th></tr></thead>
+            <tbody></tbody>
+          </table></div>
+        </div>
+        <div class="stack">
+          <div class="card">
+            <h2 data-i18n>Generate</h2>
+            <label><span data-i18n>Source</span>
+              <span class="inline"><select id="gen-source"><option value="" data-i18n>Ticked folders</option></select><button type="button" class="btn ghost" id="tpl-edit" data-i18n>Templates…</button></span>
+            </label>
+            <div id="gen-folders-box">
+              <p class="muted small" data-i18n>Tick folders in the media list (☐ next to a folder) to fill the day from them, including subfolders. Read-only on the share.</p>
+              <div id="gen-folders" class="chips"></div>
+              <div id="gen-count" class="sel-count muted"></div>
+            </div>
+            <p class="hint" id="gen-tpl-hint" hidden></p>
+            <label class="check"><input type="checkbox" id="gen-shuffle" checked> <span data-i18n>Shuffle</span></label>
+            <label class="check"><input type="checkbox" id="gen-skip-flagged"> <span data-i18n>Skip files flagged for conforming</span></label>
+            <label class="check"><input type="checkbox" id="gen-cleared" checked> <span data-i18n>Only clips with YouTube rights cleared</span></label>
+            <label data-i18n-attr="title" class="check" title="Combed, silent, one channel, no audio/video, check failed"><input type="checkbox" id="gen-skip-issues" checked> <span data-i18n>Skip clips with problems found by the analysis</span></label>
+            <label data-i18n-attr="title" class="check" title="Leaves out 4:3, vertical, square, SD and other shapes"><input type="checkbox" id="gen-169"> <span data-i18n>Only 16:9 clips</span></label>
+            <label data-i18n-attr="title" class="check" title="Idents, stingers, up-next, openers and closers, advisory cards: rules on the Channel branding page"><input type="checkbox" id="gen-brand"> <span data-i18n>Add branding (rules on the Channel branding page)</span></label>
+            <label><span data-i18n>Broadcast window</span>
+              <select id="gen-window">
+                <option value="full" data-i18n>Full broadcast day (24 h)</option>
+                <option value="custom" data-i18n>Custom window (start and end time)</option>
+              </select>
+            </label>
+            <div class="grid2" id="gen-window-times" hidden>
+              <label><span data-i18n>Start</span> <input id="gen-win-start" inputmode="numeric" placeholder="16:00" value="16:00"></label>
+              <label><span data-i18n>End</span> <input id="gen-win-end" inputmode="numeric" placeholder="22:00" value="22:00"></label>
+            </div>
+            <p class="hint" id="gen-window-hint"></p>
+            <label class="check"><input type="checkbox" id="gen-live"> <span data-i18n>Live slot inside the window</span></label>
+            <div class="grid2" id="gen-live-times" hidden>
+              <label><span data-i18n>Live from</span> <input id="gen-live-start" inputmode="numeric" placeholder="20:00" value="20:00"></label>
+              <label><span data-i18n>Live until</span> <input id="gen-live-end" inputmode="numeric" placeholder="21:30" value="21:30"></label>
+            </div>
+            <div class="grid2">
+              <label data-i18n-attr="title" title="Uses the as-run log"><span data-i18n>Avoid clips aired in the last … days</span> <input type="number" id="gen-norepeat" min="0" max="60" value="3"></label>
+              <label data-i18n-attr="title" title="Artist = performer, or the clip's first two folder levels"><span data-i18n>Same artist at least … hours apart</span> <input type="number" id="gen-artist-gap" min="0" max="24" step="0.5" value="2"></label>
+            </div>
+            <button class="btn primary wide" id="gen-run" data-i18n>Generate for this date</button>
+            <p class="hint" id="gen-info"></p>
+            <div class="fill-row">
+              <label><span data-i18n>Fill empty days from this date</span> <input type="number" id="fill-days" min="1" max="31" value="7"></label>
+              <button class="btn" id="fill-run" data-i18n>Fill</button>
+            </div>
+            <p class="hint" data-i18n>Creates and saves playlists only for days that have none. Days that already have a playlist are left unchanged. Clips used earlier in the batch go to the back of the queue.</p>
+            <p class="hint" data-i18n>Blocks pinned to a date (Insert at a time, or an occasion) keep their times; clips fill the time around them.</p>
+          </div>
+          <div class="card" id="blk-card">
+            <div class="row-between">
+              <h2 data-i18n>Saved blocks</h2>
+              <button class="btn small" id="blk-new" data-i18n>New block</button>
+            </div>
+            <input data-i18n-attr="placeholder;aria-label" type="search" id="blk-q" placeholder="Search blocks…" aria-label="Search saved blocks">
+            <ul class="blk-list" id="blk-list"></ul>
+            <p class="hint" data-i18n>Pre-edited slots for reuse (topical days and the like). Select rows in the playlist to save them as a block. Warnings are checked for today's broadcast day.</p>
+          </div>
+          <div class="card" id="occ-card">
+            <div class="row-between">
+              <h2 data-i18n>Occasions</h2>
+              <button class="btn small" id="occ-new" data-i18n>New occasion</button>
+            </div>
+            <ul class="blk-list" id="occ-list"></ul>
+            <p class="hint" data-i18n>Days like Memorial Day: enter each date by hand. On those dates Generate and Fill use the occasion's branding set and place its blocks at their times.</p>
+          </div>
+          <div class="card">
+            <div class="row-between">
+              <h2 data-i18n>Media</h2>
+              <select data-i18n-attr="aria-label" id="br-source" style="width:auto" aria-label="Media source">
+                <option value="share" data-i18n>Media (read-only folder)</option>
+                <option value="storage" data-i18n>ffplayout storage</option>
+              </select>
+            </div>
+            <div data-i18n-attr="aria-label" class="formats" id="br-formats" role="group" aria-label="File formats"></div>
+            <div class="crumbs" id="br-crumbs"></div>
+            <input data-i18n-attr="placeholder;aria-label" type="search" id="br-filter" placeholder="Filter this folder…" aria-label="Filter this folder">
+            <ul class="browser" id="br-list"></ul>
+            <p class="hint" id="br-hint"></p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Library -->
+    <section class="view" id="view-library" hidden>
+      <header class="view-head">
+        <h1 data-i18n>Library</h1>
+        <div class="inline">
+          <button data-i18n-attr="title" class="btn" id="scan-run" title="Find new, changed and removed videos on the share (read-only)" data-i18n>Rescan library</button>
+          <a class="btn" id="meta-export" href="/local/meta/export" download data-i18n>Export CSV</a>
+          <label class="btn file-btn" tabindex="0" role="button"><span data-i18n>Import CSV</span><input type="file" id="meta-import" accept=".csv,text/csv" hidden></label>
+        </div>
+      </header>
+      <p class="muted small"><span data-i18n>Metadata for each clip in library.csv, stored on this PC in</span> <code>data\clip-metadata.json</code><span data-i18n>. Nothing on the share is changed. Duplicate copies of a file share one record. For bulk editing: Export CSV, edit in Excel, save as</span> <b data-i18n>CSV UTF-8</b><span data-i18n>, Import CSV.</span></p>
+      <div id="scan-status" class="scan-status muted small" hidden></div>
+      <div id="lib-summary" class="summary"></div>
+      <div class="card an-card">
+        <div class="row-between">
+          <h2 data-i18n>Overnight analysis</h2>
+          <span id="an-state" class="badge" data-i18n>Idle</span>
+        </div>
+        <p class="small" id="an-line"></p>
+        <div class="progress" id="an-progress" hidden><div></div></div>
+        <p class="muted small mono-ish" id="an-current"></p>
+        <div class="an-controls">
+          <label><span data-i18n>Check</span>
+            <select id="an-mode"><option value="new" data-i18n>Clips not checked yet</option><option value="all" data-i18n>Everything again</option></select>
+          </label>
+          <span class="an-checks">
+            <label class="check"><input type="checkbox" id="an-audio" checked> <span data-i18n>Audio</span></label>
+            <label class="check"><input type="checkbox" id="an-video" checked> <span data-i18n>Video</span></label>
+            <label class="check"><input type="checkbox" id="an-meta" checked> <span data-i18n>Metadata</span></label>
+            <label class="check"><input type="checkbox" id="an-thumb" checked> <span data-i18n>Thumbnail</span></label>
+            <label data-i18n-attr="title" class="check" title="After the Metadata check: clips whose title is still the raw file name get the cleaned-up title as metadata. Files on the share are never renamed."><input type="checkbox" id="an-titles"> <span data-i18n>Clean titles</span></label>
+            <label data-i18n-attr="title" class="check" title="Writes the speech and lyrics as timed text (whisper; language set in config.json) and finds the songs in each clip. Slow: about half of the clip length with 6 CPU threads. Off by default."><input type="checkbox" id="an-transcript"> <span data-i18n>Timed text</span></label>
+            <span class="an-tt" id="an-tt-opts" hidden>
+              <label data-i18n-attr="title" title="CPU threads for whisper. Fewer threads leave more for playout."><span data-i18n>Threads</span> <input id="an-threads" type="number" min="1" max="64" step="1" inputmode="numeric"></label>
+              <label data-i18n-attr="title" class="check" title="After the timed text of a clip, look up the credits of its songs in MusicBrainz (1 request per second; sends song titles to musicbrainz.org)."><input type="checkbox" id="an-credits" checked> <span data-i18n>Look up credits</span></label>
+            </span>
+          </span>
+          <label><span data-i18n>Stop at</span> <input id="an-until" inputmode="numeric" placeholder="07:00" value="07:00"></label>
+          <button class="btn primary" id="an-start" data-i18n>Start</button>
+          <button class="btn ghost danger" id="an-stop" data-i18n>Stop</button>
+        </div>
+        <p class="small an-plan" id="an-plan"></p>
+        <p class="hint"><span data-i18n>Runs on this PC at low priority, so playout keeps priority.</span> <b data-i18n>Audio</b> <span data-i18n>reads each file completely (loudness, clipping, mono, silences);</span> <b data-i18n>Video</b> <span data-i18n>checks three 10-second samples plus the start and end (combing, black, static picture);</span> <b data-i18n>Metadata</b> <span data-i18n>suggests titles and performers from the file and folder names;</span> <b data-i18n>Thumbnail</b> <span data-i18n>saves one picture per clip (a few seconds per clip) in</span> <code>data\thumbs</code>. <b data-i18n>Clean titles</b> <span data-i18n>(off by default) stores the cleaned-up title from the Metadata check (show and artist names and dates kept) as clip metadata, for clips whose title is still the raw file name; files on the share are never renamed. A stopped run continues where it left off next time. Nothing on the share is changed. Leave “Stop at” empty to run until done.</span></p>
+      </div>
+      <div class="card">
+        <div class="lib-filters">
+          <input data-i18n-attr="placeholder;aria-label" type="search" id="lib-q" placeholder="Search file, title, performer, tags… (add .mxf to filter by type)" aria-label="Search the library">
+          <select data-i18n-attr="aria-label" id="lib-folder" aria-label="Folder"><option value="" data-i18n>All folders</option></select>
+          <select data-i18n-attr="aria-label" id="lib-type" aria-label="File type"><option value="" data-i18n>All file types</option></select>
+          <select data-i18n-attr="aria-label" id="lib-rights" aria-label="Rights">
+            <option value="" data-i18n>Any rights</option><option value="unknown" data-i18n>Rights unknown</option><option value="cleared" data-i18n>Cleared</option>
+            <option value="expired" data-i18n>Cleared, expired</option><option value="cleared-nodoc" data-i18n>Cleared, no document</option><option value="blocked" data-i18n>Blocked</option>
+          </select>
+          <select data-i18n-attr="aria-label" id="lib-cat" aria-label="Category"><option value="" data-i18n>Any category</option><option value="-" data-i18n>No category</option></select>
+          <select data-i18n-attr="aria-label" id="lib-issue" aria-label="Analysis">
+            <option value="" data-i18n>Any analysis</option><option value="unchecked" data-i18n>Not checked yet</option><option value="ok" data-i18n>Checked, no problems</option>
+            <option value="problems" data-i18n>Problems found</option><option value="combed" data-i18n>Combed (interlace)</option><option value="clipping" data-i18n>Clipping</option>
+            <option value="level" data-i18n>Too quiet / too loud</option><option value="mono" data-i18n>Mono / one channel / phase</option><option value="long_silence" data-i18n>Long silence inside</option>
+            <option value="edges" data-i18n>Black or silent start/end</option><option value="static" data-i18n>Static picture</option><option value="check_failed" data-i18n>Check failed</option>
+            <option value="hidden" data-i18n>Hidden files (Needs attention)</option>
+          </select>
+          <select data-i18n-attr="title;aria-label" id="lib-aspect" title="Picture shape" aria-label="Picture shape">
+            <option value="" data-i18n>Any shape</option><option value="16:9">16:9</option><option value="not169" data-i18n>Not 16:9</option><option value="4:3">4:3</option><option value="vertical" data-i18n>Vertical</option><option value="square" data-i18n>Square</option><option value="sd" data-i18n>SD (720×576/480)</option><option value="other" data-i18n>Other shape</option>
+          </select>
+          <select data-i18n-attr="title;aria-label" id="lib-explicit" title="Explicit language" aria-label="Explicit language">
+            <option value="" data-i18n>Any language</option><option value="yes" data-i18n>Explicit language</option><option value="no" data-i18n>Not marked explicit</option>
+          </select>
+        </div>
+        <div class="row-between">
+          <span id="lib-count" class="muted small"></span>
+          <div class="inline">
+            <select data-i18n-attr="aria-label" id="lib-bulk" class="auto" aria-label="Bulk action"></select>
+            <button class="btn" id="lib-bulk-run" data-i18n>Apply</button>
+          </div>
+        </div>
+        <div class="table-wrap"><table class="tbl" id="lib-table">
+          <thead><tr><th data-sort="title" data-i18n>Title</th><th data-sort="folder" data-i18n>Folder</th><th data-sort="type" data-i18n>Type</th><th class="num" data-sort="duration" data-i18n>Duration</th><th data-sort="category" data-i18n>Category</th><th data-sort="rights" data-i18n>Rights</th><th data-i18n>Checks</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table></div>
+        <div class="btn-row"><button class="btn ghost" id="lib-prev" data-i18n>◀ Previous</button><button class="btn ghost" id="lib-next" data-i18n>Next ▶</button></div>
+      </div>
+    </section>
+
+    <!-- As-run -->
+    <section class="view" id="view-asrun" hidden>
+      <header class="view-head">
+        <h1 data-i18n>As-run</h1>
+        <div class="inline">
+          <button data-i18n-attr="title" class="btn ghost" id="ar-prev" title="Previous day">◀</button>
+          <span class="datefield"><input data-i18n-attr="placeholder" type="text" class="date-txt" data-for="ar-date" inputmode="numeric" placeholder="dd/mm/yy" autocomplete="off"><button data-i18n-attr="title" type="button" class="btn ghost icon date-pick" data-for="ar-date" title="Pick a date">📅</button><input type="date" id="ar-date" class="date-native" tabindex="-1"></span>
+          <button data-i18n-attr="title" class="btn ghost" id="ar-next" title="Next day">▶</button>
+          <button class="btn" id="ar-reload" data-i18n>Reload</button>
+        </div>
+      </header>
+      <p class="muted small"><span data-i18n>What actually aired, from ffplayout's engine log, joined with the clip details from the Library. Kept permanently in</span> <code>data\asrun</code><span data-i18n>. The CSV export has English column headers for royalty and rights-society reporting; a JSON export is also available.</span></p>
+      <div class="row-between">
+        <div id="ar-summary" class="summary"></div>
+        <div class="inline">
+          <label class="check"><input type="checkbox" id="ar-all"> <span data-i18n>Show filler and off-air</span></label>
+          <a class="btn" id="ar-export-day" href="#" download data-i18n>Export day (CSV)</a>
+          <a class="btn ghost" id="ar-export-json" href="#" download data-i18n>Day as JSON</a>
+          <a class="btn" id="ar-export-month" href="#" download data-i18n>Export month (CSV)</a>
+        </div>
+      </div>
+      <div class="card">
+        <div class="table-wrap"><table class="tbl" id="ar-table">
+          <thead><tr><th data-i18n>Time</th><th class="num" data-i18n>Aired</th><th data-i18n>Title</th><th data-i18n>Performer</th><th data-i18n>Category</th><th data-i18n>Rights</th><th data-i18n>Folder</th></tr></thead>
+          <tbody></tbody>
+        </table></div>
+      </div>
+    </section>
+
+    <!-- Channel -->
+    <section class="view" id="view-channel" hidden>
+      <header class="view-head"><h1 data-i18n>Channel &amp; schedule</h1></header>
+      <form id="channel-form" class="stack">
+        <div class="split">
+          <fieldset class="card">
+            <legend data-i18n>Channel</legend>
+            <label><span data-i18n>Name</span> <input name="name" required></label>
+            <label><span data-i18n>Timezone</span> <input data-i18n-attr="placeholder" name="timezone" list="tz-list" placeholder="e.g. Asia/Jerusalem"></label>
+            <datalist id="tz-list"></datalist>
+            <label><span data-i18n>Mode</span>
+              <select name="mode"><option value="playlist" data-i18n>Playlist (scheduled)</option><option value="folder" data-i18n>Folder (loop a folder)</option></select>
+            </label>
+            <label class="check"><input type="checkbox" name="add_logo"> <span data-i18n>Show logo</span></label>
+          </fieldset>
+          <fieldset class="card">
+            <legend data-i18n>Broadcast day</legend>
+            <div class="grid2">
+              <label><span data-i18n>Day start</span> <input name="day_start" pattern="\d{2}:\d{2}:\d{2}" placeholder="06:00:00" required></label>
+              <label><span data-i18n>Length</span> <input name="length" pattern="\d{2}:\d{2}:\d{2}" placeholder="24:00:00" required></label>
+            </div>
+            <label class="check"><input type="checkbox" name="infinit"> <span data-i18n>Infinite playlist (ignore day start/length)</span></label>
+            <label><span data-i18n>Filler (file or folder, relative to storage)</span>
+              <span class="inline"><input name="filler" required><button type="button" class="btn ghost" id="pick-filler" data-i18n>Browse…</button></span>
+            </label>
+            <p class="hint" data-i18n>Plays whenever the playlist runs out or a file fails, so the stream never goes black. A folder rotates its clips.</p>
+            <label><span data-i18n>File extensions</span> <input data-i18n-attr="placeholder" name="extensions" placeholder="mp4, mkv, mov, mxf"></label>
+            <label class="check"><input type="checkbox" name="shuffle"> <span data-i18n>Shuffle in folder mode</span></label>
+          </fieldset>
+        </div>
+        <fieldset class="card">
+          <legend data-i18n>Channel logo</legend>
+          <div class="logo-row">
+            <div class="logo-preview" id="logo-preview" data-i18n>No logo uploaded</div>
+            <div class="stack-tight">
+              <label class="btn file-btn" tabindex="0" role="button"><span data-i18n>Upload logo (PNG)…</span><input type="file" id="logo-file" accept=".png,image/png" hidden></label>
+              <p class="hint"><span data-i18n>A transparent PNG works best. It is saved in ffplayout storage as</span> <code>00-assets\channel-logo.png</code><span data-i18n>. Tick “Show logo” above and Save channel to put it on air (needs a playout restart).</span></p>
+            </div>
+          </div>
+          <div class="grid3">
+            <label><span data-i18n>Position</span> <input name="logo_position" placeholder="W-w-12:12"></label>
+            <label><span data-i18n>Opacity (0–1)</span> <input name="logo_opacity" type="number" step="0.05" min="0" max="1"></label>
+            <label><span data-i18n>Scale</span> <input data-i18n-attr="placeholder" name="logo_scale" placeholder="e.g. 200:-1 (empty = original)"></label>
+          </div>
+          <p class="hint"><span data-i18n>Position is an ffmpeg overlay expression:</span> <code>W-w-12:12</code> <span data-i18n>= top right,</span> <code>12:12</code> <span data-i18n>= top left,</span> <code>W-w-12:H-h-12</code> <span data-i18n>= bottom right.</span></p>
+        </fieldset>
+        <fieldset class="card">
+          <legend data-i18n>Loudness (EBU R128)</legend>
+          <div class="grid3">
+            <label><span data-i18n>Apply to</span>
+              <select name="loudness_scope"><option value="all" data-i18n>Whole program</option><option value="live" data-i18n>Live input only</option><option value="off" data-i18n>Off</option></select>
+            </label>
+            <label><span data-i18n>Target (LUFS)</span> <input name="loudness_target_lufs" type="number" step="0.5" min="-40" max="-5"></label>
+            <label><span data-i18n>True-peak ceiling (dBTP)</span> <input name="loudness_true_peak_ceiling_dbtp" type="number" step="0.5" min="-9" max="0"></label>
+          </div>
+          <p class="hint" data-i18n>−23 LUFS is the broadcast (EBU R128) target. YouTube normalises to about −14 LUFS, so quieter streams are not turned up.</p>
+        </fieldset>
+        <div class="btn-row"><button class="btn primary" type="submit" data-i18n>Save channel</button><span class="form-msg" id="channel-msg"></span></div>
+      </form>
+
+      <div class="split" style="margin-top:16px">
+        <fieldset class="card">
+          <legend data-i18n>Automation account</legend>
+          <p class="muted small"><span data-i18n>Lower thirds run on this PC without a browser open, so the panel signs in to ffplayout with its own account. Create a separate ffplayout user for it (in the ffplayout UI), then enter it here. It is stored on this PC in</span> <code>data\panel-secrets.json</code>.</p>
+          <form id="auto-account" class="grid2">
+            <label><span data-i18n>Username</span> <input name="username" autocomplete="off" required></label>
+            <label><span data-i18n>Password</span> <input name="password" type="password" autocomplete="new-password" required></label>
+          </form>
+          <div class="btn-row"><button class="btn" id="auto-account-save" data-i18n>Test and save</button><span class="form-msg" id="auto-account-msg"></span></div>
+        </fieldset>
+        <fieldset class="card">
+          <legend data-i18n>Lower thirds (now / next)</legend>
+          <form id="auto-form">
+            <label class="check"><input type="checkbox" name="enabled"> <span data-i18n>Show “now” at each clip start and “next” before it ends</span></label>
+            <div class="grid2">
+              <label><span data-i18n>“Now” label</span> <input name="now_label"></label>
+              <label><span data-i18n>“Next” label</span> <input name="next_label"></label>
+              <label><span data-i18n>Show for (seconds)</span> <input name="show_s" type="number" min="3" max="120"></label>
+              <label><span data-i18n>“Next” before the end (seconds)</span> <input name="next_before_s" type="number" min="5" max="300"></label>
+              <label><span data-i18n>Font</span> <input name="font_family" list="font-list"></label>
+              <label><span data-i18n>Font size</span> <input name="font_size" type="number" min="12" max="120"></label>
+              <label><span data-i18n>Position X</span> <input name="position_x" placeholder="end:96"></label>
+              <label><span data-i18n>Position Y</span> <input name="position_y" placeholder="end:96"></label>
+              <label><span data-i18n>Background opacity (0–1)</span> <input name="background_opacity" type="number" step="0.05" min="0" max="1"></label>
+            </div>
+            <datalist id="font-list"></datalist>
+          </form>
+          <div class="btn-row"><button class="btn primary" id="auto-save" data-i18n>Save lower thirds</button><span class="form-msg" id="auto-msg"></span></div>
+          <p class="hint" id="auto-status"></p>
+        </fieldset>
+      </div>
+    </section>
+
+    <!-- Live -->
+    <section class="view" id="view-live" hidden>
+      <header class="view-head"><h1 data-i18n>Live input</h1></header>
+      <p class="muted" data-i18n>When a live source connects, it takes over the playout; when it disconnects, the schedule resumes. Up to 8 listeners. Higher priority wins.</p>
+      <div class="card">
+        <div class="table-wrap"><table class="tbl" id="live-table">
+          <thead><tr><th data-i18n>On</th><th data-i18n>Name</th><th data-i18n>Type</th><th data-i18n>Listen on</th><th data-i18n>Port</th><th data-i18n>App / key</th><th data-i18n>Priority</th><th data-i18n>Send to</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table></div>
+        <div class="btn-row">
+          <button class="btn" id="live-add" data-i18n>Add listener</button>
+          <button class="btn primary" id="live-save" data-i18n>Save live inputs</button>
+          <span class="form-msg" id="live-msg"></span>
+        </div>
+        <p class="hint" data-i18n>“This PC only” (127.0.0.1) accepts sources on this machine only. Pick “All interfaces” for an encoder elsewhere on the network, and allow the port in Windows Firewall.</p>
+      </div>
+      <!-- Capture devices on this PC -> a live input listener -->
+      <div class="card cap-card" id="cap-card">
+        <div class="row-between"><h2 data-i18n>Capture devices on this PC</h2><button class="btn ghost small" id="cap-refresh" data-i18n>Refresh devices</button></div>
+        <p class="muted small"><span data-i18n>Send a camera and a microphone connected to this PC to a live input listener. Choose them like in a video call: the preview shows what will be sent. Nothing is sent until you press</span> <b data-i18n>Send to live input</b>.</p>
+        <div class="conn" id="cap-orphan" hidden></div>
+        <p class="small" id="cap-msg" role="status"></p>
+        <div class="cap-grid" id="cap-choose">
+          <div class="cap-video">
+            <label><span data-i18n>Video source</span> <select id="cap-video"></select></label>
+            <label><span data-i18n>Format</span> <select id="cap-format"></select></label>
+            <div class="cap-box"><video id="cap-preview" muted playsinline autoplay hidden></video><img data-i18n-attr="alt" id="cap-img" alt="Camera preview" hidden><span id="cap-nopic" class="muted small" data-i18n>No preview</span></div>
+            <p class="muted small" id="cap-prev-note"></p>
+          </div>
+          <div class="cap-audio">
+            <label><span data-i18n>Audio source</span> <select id="cap-audio"></select></label>
+            <div class="cap-meter-wrap"><canvas data-i18n-attr="aria-label" id="cap-meter" width="170" height="400" role="img" aria-label="Audio level meter, left and right"></canvas></div>
+            <p class="muted small cap-meter-note" data-i18n>Sample peak, dBFS</p>
+          </div>
+        </div>
+        <div class="cap-send" id="cap-send">
+          <label><span data-i18n>Send to</span> <select id="cap-target"></select></label>
+          <button class="btn air cap-big" id="cap-start" data-i18n>Send to live input</button>
+          <span class="small" id="cap-target-note"></span>
+        </div>
+        <div class="cap-onair" id="cap-onair" hidden>
+          <div class="cap-onair-head"><span class="cap-onair-badge" data-i18n>ON AIR</span><span id="cap-onair-what" class="small"></span></div>
+          <div id="cap-health" class="mono small"></div>
+          <div id="cap-errors" class="small warn"></div>
+          <button class="btn danger cap-big" id="cap-stop" data-i18n>Stop</button>
+        </div>
+        <p class="hint"><span data-i18n>Sends 1920×1080, 25 fps, H.264 at about 6 Mbit/s with 48 kHz stereo sound. ffplayout takes over the broadcast as soon as the live input receives the stream, and goes back to the playlist when you press Stop. Log:</span> <code>logs\capture.log</code>.</p>
+      </div>
+    </section>
+
+    <!-- Channel branding: playlist rules, live text and branding files per type -->
+    <section class="view" id="view-branding" hidden>
+      <header class="view-head"><h1 data-i18n>Channel branding</h1></header>
+      <div class="card brand-setbar">
+        <div class="inline wrap">
+          <label class="inline"><span data-i18n>Branding set</span> <select id="brand-set" class="auto"><option value="" data-i18n>Default</option></select></label>
+          <button class="btn ghost" id="brand-set-new" data-i18n>New set…</button>
+        </div>
+        <p class="hint" id="brand-set-hint"></p>
+      </div>
+      <p class="muted"><span data-i18n>Upload the channel's branding files here. Each file is checked against the branding kit spec (1920×1080, 25 fps progressive, 48 kHz stereo, −14 LUFS) the moment it arrives. Files are stored in</span> <code>storage\branding</code><span data-i18n>; replaced or removed files are moved aside, never deleted.</span></p>
+      <div class="brand-cols">
+        <div class="card">
+          <h2 data-i18n>Playlist rules</h2>
+          <p class="muted small" data-i18n>Applied when a day is built with “Add branding” ticked on the Program page. Only files that passed the check are used; each type is rotated.</p>
+          <form id="brand-rules" class="rules-form">
+            <label class="check"><input type="checkbox" name="hourly_ident"> <span data-i18n>Ident at the start of every hour</span></label>
+            <label class="inline"><span data-i18n>Ident every</span> <input type="number" name="ident_every_min" min="0" max="240"> <span data-i18n>min (0 = off)</span></label>
+            <label class="check"><input type="checkbox" name="stingers"> <span data-i18n>Stinger between two short clips</span></label>
+            <label class="inline"><span data-i18n>“Short” means up to</span> <input type="number" name="stinger_max_clip_min" min="1" max="60"> <span data-i18n>min</span></label>
+            <label class="inline"><span data-i18n>Up-next before clips of</span> <input type="number" name="upnext_min_clip_min" min="0" max="240"> <span data-i18n>min or longer (0 = off)</span></label>
+            <label class="check"><input type="checkbox" name="concert_wrap"> <span data-i18n>Opener and closer around full concerts (the categories marked "concert" in config.json)</span></label>
+            <label class="check"><input type="checkbox" name="advisory"> <span data-i18n>Explicit-language card before clips marked explicit</span></label>
+            <label class="inline"><span data-i18n>Explicit clips only from</span> <input type="text" name="explicit_after" placeholder="22:00" inputmode="numeric"> <span data-i18n>until the broadcast day starts (empty = any time)</span></label>
+            <div class="btn-row"><button class="btn primary" type="submit" data-i18n>Save rules</button></div>
+          </form>
+        </div>
+        <div class="card">
+          <h2 data-i18n>Live text</h2>
+          <p class="muted small"><span data-i18n>Drawn by the playout over what is playing, using the lower-third font settings on the Channel &amp; schedule page and the automation account set there. There is one text layer: on an explicit clip the tag shows first, then the lower third.</span> <b data-i18n>Not yet seen on air; check the look on the TEST channel.</b></p>
+          <form id="brand-live" class="rules-form">
+            <label class="check"><input type="checkbox" name="explicit_enabled"> <span data-i18n>Explicit-language tag in the top corner</span></label>
+            <label><span data-i18n>Tag text</span> <input name="explicit_text" dir="auto"></label>
+            <label class="inline"><span data-i18n>Show for</span> <input type="number" name="explicit_s" min="5" max="300"> <span data-i18n>s from the start of the clip</span></label>
+            <label class="check"><input type="checkbox" name="upnext_enabled"> <span data-i18n>Up-next line over up-next backgrounds (the next clip's title and performer)</span></label>
+            <label><span data-i18n>Label</span> <input name="upnext_label" dir="auto"></label>
+            <div class="btn-row"><button class="btn primary" type="submit" data-i18n>Save live text</button></div>
+          </form>
+        </div>
+      </div>
+      <div class="brand-grid2" id="brand-types"></div>
+    </section>
+
+    <!-- Block builder: full-screen two-pane editor for a saved block or a whole day -->
+    <section class="view builder" id="view-builder" hidden>
+      <header class="bld-head">
+        <div class="bld-titles"><span class="badge" id="bld-mode" data-i18n>Block</span><h1 id="bld-title" data-i18n>Block builder</h1></div>
+        <div class="bld-meta" id="bld-meta"></div>
+        <div class="btn-row tight">
+          <button class="btn primary" id="bld-save" data-i18n>Save</button>
+          <button class="btn" id="bld-saveas" data-i18n>Save as copy</button>
+          <button class="btn ghost" id="bld-close" data-i18n>Close</button>
+        </div>
+      </header>
+      <div class="bld-bar" id="bld-bar"></div>
+      <div class="bld-panes">
+        <section data-i18n-attr="aria-label" class="bld-pane bld-left" id="bld-left" aria-label="Sources">
+          <div class="bld-tabs" role="tablist" id="bld-tabs"></div>
+          <div class="bld-src-tools" id="bld-src-tools"></div>
+          <div data-i18n-attr="aria-label" class="bld-list" id="bld-src" tabindex="0" aria-label="Source list"></div>
+          <div class="bld-src-foot muted small" id="bld-src-foot"></div>
+        </section>
+        <div class="bld-mid">
+          <button data-i18n-attr="title" class="btn" id="bld-add" title="Add the selected sources after the cursor row (Enter / Insert)" data-i18n>Add →</button>
+          <button data-i18n-attr="title" class="btn ghost" id="bld-addall" title="Add every search result" data-i18n>Add all results →</button>
+          <button data-i18n-attr="title" class="btn ghost" id="bld-remove" title="Remove the selected rows (Delete)" data-i18n>← Remove</button>
+          <button data-i18n-attr="title" class="btn ghost" id="bld-up" title="Move up (Ctrl+↑)">↑</button>
+          <button data-i18n-attr="title" class="btn ghost" id="bld-down" title="Move down (Ctrl+↓)">↓</button>
+          <button data-i18n-attr="title" class="btn ghost" id="bld-undo" title="Undo (Ctrl+Z)">↶</button>
+          <button data-i18n-attr="title" class="btn ghost" id="bld-redo" title="Redo (Ctrl+Y)">↷</button>
+        </div>
+        <section data-i18n-attr="aria-label" class="bld-pane bld-right" id="bld-right-pane" aria-label="List">
+          <div class="bld-thead"><span>#</span><span data-i18n>Start</span><span data-i18n>Title</span><span class="num" data-i18n>Length</span><span data-i18n>In</span><span data-i18n>Out</span><span></span></div>
+          <div data-i18n-attr="aria-label" class="bld-list" id="bld-tgt" tabindex="0" aria-label="List being built"></div>
+        </section>
+      </div>
+      <p class="hint bld-keys" data-i18n>Tab switches pane · ↑ ↓ cursor · Space select · Ctrl/Shift+click multi-select · Enter or Insert add · Delete remove · Ctrl+↑/↓ move · F3 play in VLC · F4 clip details · Ctrl+Z / Ctrl+Y undo/redo · Ctrl+F search. Drag from left to right to add, within the right to reorder, right to left to remove.</p>
+    </section>
+
+    <!-- Logs -->
+    <section class="view" id="view-logs" hidden>
+      <header class="view-head">
+        <h1 data-i18n>Logs</h1>
+        <div class="inline">
+          <select data-i18n-attr="aria-label" id="log-level" aria-label="Log level"><option value="" data-i18n>All levels</option><option value="ERROR" data-i18n>Errors</option><option value="WARN" data-i18n>Warnings+</option></select>
+          <span class="datefield"><input data-i18n-attr="placeholder" type="text" class="date-txt" data-for="log-date" inputmode="numeric" placeholder="dd/mm/yy" autocomplete="off"><button data-i18n-attr="title" type="button" class="btn ghost icon date-pick" data-for="log-date" title="Pick a date">📅</button><input type="date" id="log-date" class="date-native" tabindex="-1"></span>
+          <button class="btn" id="log-reload" data-i18n>Reload</button>
+        </div>
+      </header>
+      <pre class="logbox" id="logbox"></pre>
+    </section>
+    <!-- System settings: decisions that span the panel, the boot script and ffplayout (administrator) -->
+    <section class="view" id="view-system" hidden>
+      <header class="view-head"><h1 data-i18n>System settings</h1><button class="btn ghost small" id="sys-reload" data-i18n>Reload</button></header>
+      <p class="muted"><span data-i18n>Decisions that apply to the whole installation: the panel, the boot script and the engine follow them. Only an administrator can change them. Stored in</span> <code>data\system.json</code>.</p>
+      <form id="sys-form" class="stack">
+        <div class="split">
+          <fieldset class="card">
+            <legend data-i18n>After a reboot or an engine restart</legend>
+            <label><span data-i18n>Channel</span>
+              <select name="on_boot">
+                <option value="continue" data-i18n>Continue: start the channel again if it was on air before</option>
+                <option value="stop" data-i18n>Stop: stay off until someone presses Start</option>
+              </select>
+            </label>
+            <label><span data-i18n>Do not resume if the last "on air" is older than</span> <span class="inline"><input name="resume_max_age_h" type="number" min="1" max="8760" step="1" inputmode="numeric"> <span data-i18n>hours</span></span></label>
+            <p class="muted small" data-i18n>The panel records every Start, Stop and Restart it sends to ffplayout. At boot (and after the watchdog restarts a crashed engine) the boot script asks the panel to resume; the panel starts the channel only when the last recorded state was on air, within this age, and the automation account is set on the Channel &amp; schedule page. Commands given in ffplayout's own UI are not recorded.</p>
+            <div class="inline"><button class="btn primary" type="submit" data-i18n>Save</button><span class="form-msg" id="sys-msg"></span></div>
+          </fieldset>
+          <fieldset class="card">
+            <legend><span data-i18n>Appearance</span></legend>
+            <label><span data-i18n>Name shown at the top left and in the browser tab</span>
+              <input id="ab-name" maxlength="40" autocomplete="off">
+            </label>
+            <div class="fld"><span data-i18n>Accent colour</span>
+              <span class="inline"><input type="color" id="ab-accent"> <button type="button" class="btn ghost small" id="ab-accent-reset" data-i18n>Default colour</button></span>
+            </div>
+            <div class="ab-logos">
+              <div><strong data-i18n>Logo in the menu</strong><div class="ab-prev"><div class="on-dark"><img data-prev="sidebar" alt="" hidden></div><div class="on-light"><img data-prev="sidebar" alt="" hidden></div></div>
+                <input type="file" id="ab-file-sidebar" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml">
+                <button type="button" class="btn ghost small" id="ab-reset-sidebar" data-i18n>Use the default</button></div>
+              <div><strong data-i18n>Logo on the sign-in page</strong><div class="ab-prev"><div class="on-dark"><img data-prev="signin" alt="" hidden></div><div class="on-light"><img data-prev="signin" alt="" hidden></div></div>
+                <input type="file" id="ab-file-signin" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml">
+                <button type="button" class="btn ghost small" id="ab-reset-signin" data-i18n>Use the default</button></div>
+            </div>
+            <div class="inline"><button type="button" class="btn primary" id="ab-save" data-i18n>Save appearance</button><span class="form-msg" id="ab-msg"></span></div>
+            <ul class="muted small ab-guide">
+              <li data-i18n>Format: PNG or SVG with a transparent background (also JPEG, WebP, GIF). Up to 1 MB.</li>
+              <li data-i18n>Size: wide, about 320 × 72 pixels (shown at up to 160 × 36 in the menu, 260 × 64 on the sign-in page). Use twice that for sharp screens; very tall pictures get small.</li>
+              <li data-i18n>Colour: the screen can be dark or light, so check both previews. A pure black or pure white logo disappears on one of them; use mid-tone colours, or give the logo its own solid background.</li>
+              <li data-i18n>A replaced logo is kept aside in the data folder. A very dark accent colour is hard to read on the dark theme.</li>
+            </ul>
+          </fieldset>
+          <fieldset class="card">
+            <legend><span data-i18n>Language and formats</span></legend>
+            <label><span><span data-i18n>Default language for new browsers</span></span>
+              <select name="default_language" id="sys-lang"></select>
+            </label>
+            <label><span><span data-i18n>Date order in this browser</span></span>
+              <select id="sys-dateorder">
+                <option value="auto" data-i18n><span data-i18n>Follow the language</span></option>
+                <option value="dmy" data-i18n><span data-i18n>Day, month, year</span></option>
+                <option value="mdy" data-i18n><span data-i18n>Month, day, year</span></option>
+                <option value="ymd" data-i18n><span data-i18n>Year, month, day</span></option>
+              </select>
+            </label>
+            <p class="muted small"><span data-i18n>Each person picks a language in the side bar; it is remembered in that browser. The default here applies to browsers that have not picked one. Dates are shown in the order of the language (or the order chosen above); times are always 24-hour; digits are always 0-9. Typing a date accepts the same order.</span></p>
+          </fieldset>
+          <fieldset class="card">
+            <legend data-i18n>Help and tutorial</legend>
+            <label class="check"><input type="checkbox" id="sys-help"> <span data-i18n>Contextual help layer: ? markers next to the main controls</span></label>
+            <label class="check"><input type="checkbox" id="sys-tutorial"> <span data-i18n>Show the first-steps tutorial when the system starts</span></label>
+            <p class="muted small" data-i18n>The tutorial walks through the basic operations once per sign-in while this is on. Skip in the tutorial closes it for now; the checkbox inside it is the same switch as this one.</p>
+            <div class="inline"><button class="btn ghost" type="button" id="sys-tour-now" data-i18n>Start the tutorial now</button></div>
+          </fieldset>
+          <fieldset class="card">
+            <legend data-i18n>Status</legend>
+            <dl class="kv" id="sys-status"></dl>
+            <div class="inline">
+              <button data-i18n-attr="title" class="btn ghost" type="button" id="sys-resume" title="Runs the resume decision now, as the boot script would" data-i18n>Test resume now</button>
+              <button data-i18n-attr="title" class="btn ghost danger" type="button" id="sys-restart" title="The panel exits and the boot watchdog starts it again within two minutes. The stream is not touched." data-i18n>Restart panel</button>
+            </div>
+            <p class="form-msg" id="sys-action"></p>
+          </fieldset>
+        </div>
+      </form>
+    </section>
+    <!-- Needs attention: problem files, copies, hidden files -->
+    <section class="view" id="view-hidden" hidden>
+      <header class="view-head"><h1 data-i18n>Hidden media</h1><button class="btn ghost small" id="hid-reload" data-i18n>Reload</button></header>
+      <p class="muted" data-i18n>Files and file types hidden from the system: they are left out of the Library, Generate, the folder browser and the overnight analysis. Nothing on the share is moved, renamed or deleted. A mark stays while the file at that path has the same content: a file replaced by a fixed version shows again by itself.</p>
+      <div id="hid-types"></div>
+      <div class="attn-bar hid-filters" id="hid-filters"></div>
+      <div class="attn-bar" id="hid-bar"></div>
+      <p class="muted small" id="hid-count"></p>
+      <div id="hid-list"></div>
+      <div class="attn-more"><button class="btn ghost" id="hid-more" hidden data-i18n>Show more</button></div>
+    </section>
+    <section class="view" id="view-attention" hidden>
+      <header class="view-head"><h1 data-i18n>Needs attention</h1><button class="btn ghost small" id="attn-reload" data-i18n>Reload</button></header>
+      <p class="muted"><span data-i18n>Files that need a decision.</span> <b data-i18n>Hide</b> <span data-i18n>takes a file out of the Library, Generate, the folder browser and the overnight analysis until you unhide it on the</span> <a href="#hidden" data-i18n>Hidden media</a> <span data-i18n>page; nothing on the share is moved, renamed or deleted.</span> <b data-i18n>Keep as is</b> <span data-i18n>clears an item; it comes back only if something new is found. To fix or delete a file, use</span> <b data-i18n>Show in folder</b>.</p>
+      <div class="attn-tabs" id="attn-tabs"></div>
+      <div class="attn-filters" id="attn-filters"></div>
+      <p class="muted small" id="attn-intro"></p>
+      <div class="attn-bar" id="attn-bar"></div>
+      <div id="attn-list"></div>
+      <div class="attn-more"><button class="btn ghost" id="attn-more" hidden data-i18n>Show more</button></div>
+    </section>
+  </main>
+</div>
+
+<!-- Modal -->
+<dialog id="modal">
+  <div class="modal-body">
+    <h2 id="modal-title"></h2>
+    <div id="modal-text"></div>
+    <div class="btn-row end">
+      <button type="button" class="btn ghost" id="modal-cancel" data-i18n>Cancel</button>
+      <button type="button" class="btn primary" id="modal-ok" data-i18n>OK</button>
+    </div>
+  </div>
+</dialog>
+
+<!-- File picker -->
+<dialog id="picker">
+  <div class="modal-body">
+    <h2 data-i18n>Choose filler</h2>
+    <div class="crumbs" id="pk-crumbs"></div>
+    <ul class="browser" id="pk-list"></ul>
+    <div class="btn-row end">
+      <button class="btn ghost" id="pk-cancel" data-i18n>Cancel</button>
+      <button class="btn primary" id="pk-folder" data-i18n>Use this folder</button>
+    </div>
+  </div>
+</dialog>
+
+<!-- Template editor -->
+<dialog id="tpl-dlg" class="wide">
+  <div class="modal-body">
+    <h2 data-i18n>Templates</h2>
+    <p class="muted small" data-i18n>A template mixes categories by weight: the generator keeps each category's share of airtime close to its weight, using only clips with that category (from the whole library, not the ticked folders).</p>
+    <div class="inline"><select data-i18n-attr="aria-label" id="tpl-pick" class="auto" aria-label="Template"></select><button class="btn ghost" id="tpl-new" data-i18n>New</button><button class="btn ghost danger" id="tpl-del" data-i18n>Remove</button></div>
+    <label><span data-i18n>Name</span> <input id="tpl-name"></label>
+    <table class="tbl" id="tpl-rows"><thead><tr><th data-i18n>Category</th><th class="num" data-i18n>Weight</th><th class="num" data-i18n>Share</th></tr></thead><tbody></tbody></table>
+    <div class="btn-row end">
+      <button type="button" class="btn ghost" id="tpl-cancel" data-i18n>Cancel</button>
+      <button type="button" class="btn primary" id="tpl-save" data-i18n>Save templates</button>
+    </div>
+  </div>
+</dialog>
+
+<!-- Saved block: name, occasion, notes, quiet -->
+<dialog id="blk-meta-dlg">
+  <form id="blk-meta-form" class="modal-body">
+    <h2 id="blk-meta-title" data-i18n>Save as block</h2>
+    <p class="muted small" id="blk-meta-sub"></p>
+    <label><span data-i18n>Name</span> <input name="name" required maxlength="80" dir="auto" autocomplete="off"></label>
+    <label><span data-i18n>Occasion</span> <input data-i18n-attr="placeholder" name="occasion" list="blk-occ-list" maxlength="80" dir="auto" autocomplete="off" placeholder="e.g. Memorial Day (optional)"></label>
+    <datalist id="blk-occ-list"></datalist>
+    <label><span data-i18n>Notes</span> <textarea name="notes" rows="3" maxlength="2000" dir="auto"></textarea></label>
+    <label class="check"><input type="checkbox" name="quiet"> <span data-i18n>Quiet — no automatic branding or live text inside this block</span></label>
+    <div class="btn-row end">
+      <button type="button" class="btn ghost" id="blk-meta-cancel" data-i18n>Cancel</button>
+      <button type="submit" class="btn primary" id="blk-meta-ok" data-i18n>Save</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Insert a saved block -->
+<dialog id="blk-ins-dlg" class="wide">
+  <div class="modal-body">
+    <h2 id="blk-ins-title" data-i18n>Insert block</h2>
+    <div id="blk-ins-body"></div>
+    <div class="btn-row end">
+      <button type="button" class="btn ghost" id="blk-ins-cancel" data-i18n>Cancel</button>
+      <button type="button" class="btn primary" id="blk-ins-ok" data-i18n>Insert</button>
+    </div>
+  </div>
+</dialog>
+
+<!-- Occasion editor -->
+<dialog id="occ-dlg" class="wide">
+  <form id="occ-form" class="modal-body">
+    <h2 id="occ-title" data-i18n>Occasion</h2>
+    <div class="grid2">
+      <label><span data-i18n>Name</span> <input data-i18n-attr="placeholder" name="name" required maxlength="80" dir="auto" autocomplete="off" placeholder="e.g. Memorial Day"></label>
+      <label><span data-i18n>Branding set</span> <select name="branding_set"></select></label>
+    </div>
+    <label><span data-i18n>Notes</span> <textarea name="notes" rows="2" maxlength="2000" dir="auto"></textarea></label>
+    <h3 data-i18n>Dates</h3>
+    <p class="muted small" data-i18n>Enter every date by hand (dd/mm/yy). Blocks are optional: add one only to place a saved block at a set time; a date without blocks still gets the occasion's branding set.</p>
+    <div id="occ-dates"></div>
+    <button type="button" class="btn small" id="occ-add-date" data-i18n>Add date</button>
+    <div class="btn-row end">
+      <button type="button" class="btn ghost" id="occ-cancel" data-i18n>Cancel</button>
+      <button type="submit" class="btn primary" data-i18n>Save occasion</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Clip metadata editor -->
+<dialog id="meta-dlg" class="wide">
+  <form id="meta-form" class="modal-body" method="dialog">
+    <div class="meta-head">
+      <div class="thumb big" id="meta-thumb-box"><img id="meta-thumb" alt="" hidden><span id="meta-thumb-msg" class="muted small"></span></div>
+      <div><h2 data-i18n>Clip details</h2>
+      <p class="muted small meta-path" id="meta-path"></p>
+      <ul class="muted small meta-copies" id="meta-copies" hidden></ul></div>
+    </div>
+    <div class="grid2">
+      <label><span data-i18n>Title</span> <input name="title"></label>
+      <label><span data-i18n>Performer</span> <input name="performer"></label>
+      <label><span data-i18n>Songwriters</span> <input data-i18n-attr="placeholder" name="songwriters" placeholder="Comma-separated"></label>
+      <label><span data-i18n>Category</span> <select name="category"></select></label>
+      <label><span data-i18n>YouTube rights</span>
+        <select name="rights"><option value="unknown" data-i18n>Unknown</option><option value="cleared" data-i18n>Cleared</option><option value="blocked" data-i18n>Blocked</option></select>
+      </label>
+      <label><span data-i18n>Rights expire on</span> <span class="datefield"><input data-i18n-attr="placeholder" type="text" class="date-txt" data-for="meta-expires" inputmode="numeric" placeholder="dd/mm/yy" autocomplete="off"><button data-i18n-attr="title" type="button" class="btn ghost icon date-pick" data-for="meta-expires" title="Pick a date">📅</button><input type="date" id="meta-expires" name="rights_expires" class="date-native" tabindex="-1"></span></label>
+      <label><span data-i18n>Rights note</span> <input data-i18n-attr="placeholder" name="rights_note" placeholder="Who cleared it, reference"></label>
+      <label><span data-i18n>Language</span> <input name="language"></label>
+      <label class="check expl-check"><input type="checkbox" name="explicit"> <span data-i18n>Explicit language (an advisory card plays before it; shown with a tag)</span></label>
+      <p class="muted small" id="meta-format"></p>
+    </div>
+    <label><span data-i18n>Tags</span> <input data-i18n-attr="placeholder" name="tags" placeholder="Comma-separated"></label>
+    <label><span data-i18n>Notes</span> <textarea name="notes" rows="3"></textarea></label>
+    <fieldset class="docs-box">
+      <legend data-i18n>Analysis</legend>
+      <div class="row-between small"><span id="meta-an-last" class="muted"></span><button type="button" class="btn ghost small" id="meta-an-run" data-i18n>Check again now</button></div>
+      <div id="meta-analysis" class="small muted" data-i18n>Not checked yet.</div>
+    </fieldset>
+    <fieldset class="docs-box">
+      <legend data-i18n>Songs</legend>
+      <div id="meta-songs" class="small muted" data-i18n>No timed text yet.</div>
+    </fieldset>
+    <fieldset class="docs-box">
+      <legend data-i18n>Release documents</legend>
+      <ul id="meta-docs" class="doc-list"></ul>
+      <label class="btn small file-btn" tabindex="0" role="button"><span data-i18n>Attach document…</span><input type="file" id="meta-doc-file" multiple hidden accept=".pdf,.png,.jpg,.jpeg,.webp,.heic,.doc,.docx,.txt,.eml,.msg"></label> <span id="meta-doc-status" class="muted small" role="status"></span>
+      <p class="hint"><span data-i18n>Uploaded right away and kept on this PC with this clip (</span><code>data\releases</code><span data-i18n>), also if the video is moved on the share. PDF, image, Word, text or e-mail files, up to 50 MB. Remove moves a file to a</span> <code>_removed</code> <span data-i18n>folder; nothing is deleted.</span></p>
+    </fieldset>
+    <div class="btn-row end">
+      <button type="button" class="btn ghost" id="meta-cancel" data-i18n>Cancel</button>
+      <button type="submit" class="btn primary" data-i18n>Save</button>
+    </div>
+  </form>
+</dialog>
+
+<div id="toast" class="toast" popover="manual" role="status" hidden></div>
+</body>
+</html>

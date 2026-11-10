@@ -1,0 +1,26 @@
+# Per-installation data: never committed
+config.json
+data/
+logs/
+playlists/
+storage/
+public/
+app/
+library.csv
+state.json
+*.bak
+*.bak-*
+.claude/
+node_modules/
+# Retired tools kept only on the original machine
+tools/_legacy/
+# Local whisper binaries and models (downloaded by the user)
+tools/whisper/bin/
+tools/whisper/models/
+
+# Site-specific whisper test harness (not part of the app)
+tools/whisper/*-test.js
+tools/whisper/run-test.ps1
+tools/whisper/test-list.txt
+tools/whisper/version.txt
+dist/
